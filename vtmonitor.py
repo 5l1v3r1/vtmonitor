@@ -2,7 +2,9 @@ import argparse
 import logging
 import json
 import hashlib
+import subprocess
 from datetime import datetime
+from time import sleep
 from virus_total_apis import PublicApi as VirusTotalPublicApi
 
 __author__ = 'Davide Tampellini'
@@ -65,13 +67,58 @@ class VTMonitor:
 
         vt = VirusTotalPublicApi(self.api_key)
 
-        with open("C:\\\Windows\\system32\\notepad.exe", 'rb') as handle:
-            test = handle.read()
+        # Create baseline of processes
+        print "[*] Creating base list of allowed process"
+        wmic = subprocess.check_output("wmic process get ExecutablePath", shell=True)
+        wmic = wmic.replace('\r', '\n')
 
-        signature = hashlib.md5(test).hexdigest()
-        response = vt.get_file_report(signature)
+        base_list = set([])
 
-        print json.dumps(response, indent=4)
+        for process in wmic.split('\n'):
+            process = process.strip()
+
+            if not process:
+                continue
+
+            base_list.add(process)
+
+        print "[*] Starting main loop to watch for new processes"
+
+        while True:
+            sleep(1)
+
+            wmic = subprocess.check_output("wmic process get ExecutablePath", shell=True)
+            wmic = wmic.replace('\r', '\n')
+
+            for process in wmic.split('\n'):
+                process = process.strip()
+
+                if not process:
+                    continue
+
+                if process in base_list:
+                    continue
+
+                print "[+] Unknown process %s, checking the hash on Virus Total" % process
+
+                # New process, let's submit to VT for details
+                with open(process, 'rb') as handle:
+                    data = handle.read()
+
+                signature = hashlib.md5(data).hexdigest()
+                response = vt.get_file_report(signature)
+
+                msg = "[-] Process %s has a known signature on Virus Total" % process
+
+                if response['results'].get('response_code') == 0:
+                    msg = "[!] Process %s is unknown on Virus Total" % process
+
+                print msg
+
+                # and add it to the base list, otherwise it will keep pinging VT all the time
+                base_list.add(process)
+
+                # print json.dumps(response, indent=4)
 
 try:
     scraper = VTMonitor()
