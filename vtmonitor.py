@@ -1,5 +1,7 @@
 import argparse
 import logging
+import json
+import hashlib
 from datetime import datetime
 from virus_total_apis import PublicApi as VirusTotalPublicApi
 
@@ -12,6 +14,7 @@ class VTMonitor:
     def __init__(self):
         self.settings = None
         self.version = '1.0.0'
+        self.api_key = None
 
         parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -33,7 +36,17 @@ class VTMonitor:
         print("===============================================================================")
 
     def checkenv(self):
-        pass
+        try:
+            with open('settings.json', 'rb') as handle:
+                _ = json.load(handle)
+                self.api_key = _['api_key']
+        except IOError:
+            raise Exception('Please rename settings-dist.json to settings.json and fill the required value')
+        except AttributeError:
+            raise Exception('Please add your Virus Total API key to the settings.json file')
+
+        if not self.api_key:
+            raise Exception('Please add your Virus Total API key to the settings.json file')
 
     def check_updates(self):
         pass
@@ -50,9 +63,15 @@ class VTMonitor:
 
         self.check_updates()
 
-        vt = VirusTotalPublicApi('')
-        vt.get_file_report('')
+        vt = VirusTotalPublicApi(self.api_key)
 
+        with open("C:\\\Windows\\system32\\notepad.exe", 'rb') as handle:
+            test = handle.read()
+
+        signature = hashlib.md5(test).hexdigest()
+        response = vt.get_file_report(signature)
+
+        print json.dumps(response, indent=4)
 
 try:
     scraper = VTMonitor()
