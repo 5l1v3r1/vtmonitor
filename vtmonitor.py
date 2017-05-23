@@ -6,6 +6,7 @@ import subprocess
 from datetime import datetime
 from time import sleep
 from virus_total_apis import PublicApi as VirusTotalPublicApi
+from virus_total_apis import PrivateApi as VirusTotalPrivateApi
 
 __author__ = 'Davide Tampellini'
 __copyright__ = '2017 Davide Tampellini - FabbricaBinaria'
@@ -17,6 +18,7 @@ class VTMonitor:
         self.settings = None
         self.version = '1.0.0'
         self.api_key = None
+        self.private_api = None
 
         parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -40,8 +42,8 @@ class VTMonitor:
     def checkenv(self):
         try:
             with open('settings.json', 'rb') as handle:
-                _ = json.load(handle)
-                self.api_key = _['api_key']
+                settings = json.load(handle)
+                self.api_key = settings['api_key']
         except IOError:
             raise Exception('Please rename settings-dist.json to settings.json and fill the required value')
         except AttributeError:
@@ -49,6 +51,8 @@ class VTMonitor:
 
         if not self.api_key:
             raise Exception('Please add your Virus Total API key to the settings.json file')
+
+        self.private_api = settings['private']
 
     def check_updates(self):
         pass
@@ -65,7 +69,10 @@ class VTMonitor:
 
         self.check_updates()
 
-        vt = VirusTotalPublicApi(self.api_key)
+        if self.private_api:
+            vt = VirusTotalPrivateApi(self.api_key)
+        else:
+            vt = VirusTotalPublicApi(self.api_key)
 
         # Create baseline of processes
         print "[*] Creating base list of allowed process"
